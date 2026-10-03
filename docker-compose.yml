@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Single Source of Truth (SSOT) with Row-Level Security readiness
+  postgres:
+    image: postgres:15-alpine
+    container_name: 8above_postgres_ssot
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secure_root_password
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 2. FastAPI Ingestion & Cryptographic Verification Engine
+  backend:
+    build: ./backend
+    container_name: 8above_backend_engine
+    environment:
+      - DATABASE_URL=postgresql://postgres:secure_root_password@postgres:5432/postgres
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # 3. Self-Hosted n8n Orchestration Gateway (100% Free & Local)
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: 8above_n8n_gateway
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Europe/Madrid
+    volumes:
+      - n8ndata:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  n8ndata:

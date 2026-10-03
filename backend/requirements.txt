@@ -1,8 +1,4 @@
 fastapi
-uvicorn[standard]
+uvicorn
 pydantic
-pytest
-httpx
-sqlalchemy>=2.0
-psycopg[binary]
-alembic
+asyncpg
