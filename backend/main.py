@@ -1,18 +1,29 @@
 import hashlib
 import json
-import os
 from datetime import datetime
 from typing import List
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from database import SovereignDBPool
+from ingestion import process_csv_feed
+from legislation_engine import JurisdictionMonitor
 
 app = FastAPI(
-    title="8above.pro Sovereign Core API",
-    version="1.0.0",
-    docs_url=None,
-    redoc_url=None
+    title="8above.pro Sovereign Core & Law-Adapter API",
+    version="2.0.0",
+    description="Institutional Sovereign Asset Ledger with Autonomous Legislative Impact Engine"
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+legislative_monitor = JurisdictionMonitor()
 
 @app.on_event("startup")
 async def startup_event():
@@ -22,63 +33,40 @@ async def startup_event():
 async def shutdown_event():
     await SovereignDBPool.close()
 
-class Holding(BaseModel):
-    ticker: str = Field(..., min_length=1, max_length=20)
-    shares: float = Field(..., gt=0)
-    price: float = Field(..., ge=0)
-
-class CustodianPayload(BaseModel):
-    account_id: str = Field(..., min_length=5)
-    base_currency: str = Field(..., min_length=3, max_length=3)
-    total_valuation: float = Field(..., ge=0)
-    holdings: List[Holding]
-    as_of_timestamp: str
-
-class IngestionRequest(BaseModel):
+class TenantProfileCheck(BaseModel):
     tenant_id: str
-    custodian_source: str
-    payload: CustodianPayload
+    jurisdiction: str = Field(..., description="e.g. CH_SWITZERLAND, UAE_DIFC, IN_SEBI")
+    held_asset_classes: List[str]
 
-def generate_immutable_hash(tenant_id: str, payload_dict: dict) -> str:
-    canonical_payload = json.dumps(payload_dict, sort_keys=True)
-    tenant_salt = os.getenv(f"SALT_{tenant_id}", "DEFAULT_SOVEREIGN_ROOT_SALT")
-    signature_string = f"{tenant_salt}::{canonical_payload}"
-    return hashlib.sha256(signature_string.encode('utf-8')).hexdigest()
+@app.get("/v1/health")
+async def health_check():
+    return {"status": "ONLINE", "mode": "SOVEREIGN_AIR_GAPPED", "timestamp": datetime.utcnow().isoformat() + "Z"}
 
-@app.post("/v1/ingest/ledger", status_code=status.HTTP_201_CREATED)
-async def ingest_custodian_data(data: IngestionRequest):
+@app.post("/v1/governance/impact-radar")
+async def check_legislative_impact(profile: TenantProfileCheck):
+    """Dynamically scans pipeline and enacted laws, returning Good/Moderate/Bad/Worse impact flags."""
     try:
-        payload_dict = data.payload.dict()
-        account_hash = hashlib.sha256(data.payload.account_id.encode('utf-8')).hexdigest()
-        row_signature = generate_immutable_hash(data.tenant_id, payload_dict)
-        
-        pool = await SovereignDBPool.get_connection()
-        
-        async with pool.acquire() as connection:
-            await connection.execute(
-                """
-                INSERT INTO asset_ledger (tenant_id, custodian_source, account_hash, canonical_payload, row_signature)
-                VALUES ($1, $2, $3, $4::jsonb, $5)
-                """,
-                data.tenant_id,
-                data.custodian_source,
-                account_hash,
-                json.dumps(payload_dict),
-                row_signature
-            )
-
+        exposures = legislative_monitor.evaluate_tenant_exposure(profile.jurisdiction, profile.held_asset_classes)
         return {
-            "status": "VERIFIED_AND_LOCKED_IN_SSOT",
-            "ledger_receipt": {
-                "tenant_id": data.tenant_id,
-                "custodian": data.custodian_source,
-                "cryptographic_proof": row_signature[:16] + "...",
-                "timestamp": datetime.utcnow().isoformat()
-            }
+            "tenant_id": profile.tenant_id,
+            "monitored_jurisdiction": profile.jurisdiction,
+            "total_alerts": len(exposures),
+            "impact_assessment_matrix": exposures,
+            "audit_timestamp": datetime.utcnow().isoformat() + "Z"
         }
-
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ingestion pipeline halted: {str(e)}"
-        )
+        raise HTTPException(status_code=400, detail=f"Impact radar failure: {str(e)}")
+
+@app.post("/v1/ingest/statement")
+async def ingest_statement(
+    tenant_id: str = Form(...),
+    custodian: str = Form(...),
+    file: UploadFile = File(...)
+):
+    """Ingests multi-custodian CSV statements with SHA-256 cryptographic non-repudiation."""
+    try:
+        file_bytes = await file.read()
+        result = await process_csv_feed(tenant_id, custodian, file_bytes)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ingestion pipeline error: {str(e)}")

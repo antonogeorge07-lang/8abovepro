@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8above.pro | Sovereign Executive Terminal</title>
+    <!-- Tailwind CSS v4 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #06080C;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(99, 102, 241, 0.03) 0%, transparent 40%);
+        }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Majestic Liquid Glassmorphism */
+        .glass-panel {
+            background: rgba(13, 17, 28, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+        .glass-panel-hover:hover {
+            border-color: rgba(56, 189, 248, 0.2);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(56, 189, 248, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .glow-accent {
+            box-shadow: 0 0 40px -10px rgba(56, 189, 248, 0.12);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen selection:bg-sky-500 selection:text-slate-950" x-data="sovereignTerminal()">
+
+    <!-- Majestic Floating Header -->
+    <header class="border-b border-white/5 glass-panel sticky top-0 z-50 px-8 py-5 flex items-center justify-between">
+        <div class="flex items-center space-x-6">
+            <div class="flex items-center space-x-3">
+                <div class="relative flex items-center justify-center">
+                    <div class="w-2.5 h-2.5 rounded-full bg-sky-400"></div>
+                    <div class="absolute w-5 h-5 rounded-full bg-sky-400/20 animate-ping"></div>
+                </div>
+                <span class="font-bold tracking-tight text-xl text-white">8ABOVE<span class="text-sky-400">.PRO</span></span>
+            </div>
+            <div class="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/5 text-xs font-mono text-slate-400">
+                <span class="text-sky-400">NODE:</span> <span>CH-GENEVA-SECURE-01</span>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-6">
+            <div class="hidden md:flex items-center space-x-3 text-xs font-mono text-slate-400 bg-emerald-950/20 border border-emerald-500/20 px-3.5 py-1.5 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>SHA-256 Ledger Anchor: <span class="text-emerald-300 font-semibold">Immutable</span></span>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-500/20 to-indigo-500/20 border border-white/10 flex items-center justify-center text-xs font-mono text-sky-300 font-bold">
+                AG
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-8 py-10 space-y-10">
+
+        <!-- Welcome Banner & Quick Status -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight text-white">Executive Sovereign Terminal</h1>
+                <p class="text-sm text-slate-400 mt-1">Institutional asset ledger, cryptographic non-repudiation, and autonomous legislative defense.</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button class="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium tracking-wide transition text-slate-300">
+                    Export Audit Package
+                </button>
+                <button class="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs tracking-wide transition shadow-lg shadow-sky-500/20">
+                    Deploy Tenant Node
+                </button>
+            </div>
+        </div>
+
+        <!-- Executive Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="glass-panel glass-panel-hover p-6 rounded-3xl transition duration-300 glow-accent space-y-2">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">AUM Sovereign Core</p>
+                <h3 class="text-3xl font-bold text-white tracking-tight">$248,450,920</h3>
+                <div class="flex items-center space-x-1.5 text-xs text-emerald-400 pt-1 font-medium">
+                    <span>↑ Multi-Custodian Synchronized</span>
+                </div>
+            </div>
+            <div class="glass-panel glass-panel-hover p-6 rounded-3xl transition duration-300 space-y-2">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Active Jurisdictions</p>
+                <h3 class="text-3xl font-bold text-white tracking-tight">4 Nodes</h3>
+                <p class="text-xs text-sky-400 pt-1 font-mono">CH, UAE, SG, IN</p>
+            </div>
+            <div class="glass-panel glass-panel-hover p-6 rounded-3xl transition duration-300 space-y-2">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Cryptographic Integrity</p>
+                <h3 class="text-3xl font-bold text-emerald-400 tracking-tight font-mono">100.0%</h3>
+                <p class="text-xs text-slate-400 pt-1">Zero Hash Drift Detected</p>
+            </div>
+            <div class="glass-panel glass-panel-hover p-6 rounded-3xl transition duration-300 space-y-2">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-wider">Legislative Risk Radar</p>
+                <h3 class="text-3xl font-bold text-amber-400 tracking-tight">2 Active Flags</h3>
+                <p class="text-xs text-amber-400/90 pt-1">1 Pipeline Shift Flagged</p>
+            </div>
+        </div>
+
+        <!-- Split Grid: Legislative Impact Radar & Tenant Config Inspector -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Legislative Impact Radar (2 Cols) -->
+            <div class="lg:col-span-2 glass-panel p-8 rounded-3xl space-y-6">
+                <div class="flex items-center justify-between border-b border-white/5 pb-5">
+                    <div>
+                        <h2 class="text-lg font-bold text-white tracking-tight">Autonomous Legislative Impact Radar</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Real-time legislative pipelines mapped to institutional risk tiers</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">Live Intelligence Feed</span>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Bad Impact Alert -->
+                    <div class="p-5 rounded-2xl bg-red-950/15 border border-red-500/25 space-y-3 transition hover:border-red-500/40">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <span class="px-2.5 py-1 rounded-lg bg-red-500/20 text-red-400 font-mono text-xs font-bold border border-red-500/30">BAD</span>
+                                <h4 class="text-sm font-semibold text-slate-100">Cross-Border Data Residency & Non-Coercion Act Update</h4>
+                            </div>
+                            <span class="text-xs font-mono text-slate-400 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">CH_SWITZERLAND</span>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed">Tightens cross-border data transfer parameters for non-tenant cloud storage holding multi-custodian assets.</p>
+                        <div class="flex items-center justify-between pt-2 border-t border-red-500/15 text-xs font-mono text-slate-400">
+                            <span>Ref: Swiss FADP Art. 16</span>
+                            <span class="text-red-400 font-medium">Action: Local Air-Gap Enforced</span>
+                        </div>
+                    </div>
+
+                    <!-- Good Impact Alert -->
+                    <div class="p-5 rounded-2xl bg-emerald-950/15 border border-emerald-500/25 space-y-3 transition hover:border-emerald-500/40">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30">GOOD</span>
+                                <h4 class="text-sm font-semibold text-slate-100">AI-Native Financial Center Autonomous Systems Mandate</h4>
+                            </div>
+                            <span class="text-xs font-mono text-slate-400 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/5">UAE_DIFC</span>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed">Mandates explicit cryptographic audit trails and Autonomous Systems Officer (ASO) oversight for automated wealth ledgers.</p>
+                        <div class="flex items-center justify-between pt-2 border-t border-emerald-500/15 text-xs font-mono text-slate-400">
+                            <span>Ref: DIFC Data Protection Reg 10</span>
+                            <span class="text-emerald-400 font-medium">Action: Fully Compliant</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tenant Config Inspector (1 Col) -->
+            <div class="glass-panel p-8 rounded-3xl space-y-6 flex flex-col justify-between">
+                <div class="space-y-6">
+                    <div class="border-b border-white/5 pb-5">
+                        <h2 class="text-lg font-bold text-white tracking-tight">Tenant Config Inspector</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Active organizational deployment boundaries</p>
+                    </div>
+
+                    <div class="space-y-3 font-mono text-xs">
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex justify-between items-center">
+                            <span class="text-slate-400">Tenant ID:</span>
+                            <span class="text-sky-400 font-medium">family_office_dubai_04</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex justify-between items-center">
+                            <span class="text-slate-400">Jurisdiction:</span>
+                            <span class="text-slate-200">UAE_DIFC</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex justify-between items-center">
+                            <span class="text-slate-400">Storage Mode:</span>
+                            <span class="text-emerald-400">AIR_GAPPED_LOCAL</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex justify-between items-center">
+                            <span class="text-slate-400">Custodian Feeds:</span>
+                            <span class="text-slate-200">UBS, Pictet, ADGM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-6">
+                    <button class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-sky-400 to-indigo-500 hover:from-sky-300 hover:to-indigo-400 text-slate-950 font-bold transition text-xs tracking-wider uppercase shadow-xl shadow-sky-500/15">
+                        Configure Custom Tenant
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        function sovereignTerminal() {
+            return {
+                // Future reactive methods for live WebSocket feeds
+            }
+        }
+    </script>
+</body>
+</html>
