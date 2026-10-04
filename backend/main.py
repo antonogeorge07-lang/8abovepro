@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from database import SovereignDBPool
 from auth_context import PrincipalContext
-from auth_dependency import current_principal
+from authorization import Permission
+from auth_dependency import current_principal, permission_required
 from fastapi import Depends
 from ingestion import process_csv_feed
 from legislation_engine import JurisdictionMonitor
@@ -94,14 +95,23 @@ async def ingest_statement(
 
 from audit_exporter import generate_zk_audit_package
 
-@app.get("/v1/audit/export/{tenant_id}")
-async def export_audit_package(tenant_id: str):
-    """Generates a cryptographically sealed Zero-Knowledge audit package for external auditors."""
+@app.get("/v1/audit/export")
+async def export_audit_package(
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.AUDIT_EXPORT)
+    ),
+):
+    """Generates an audit package scoped to the authenticated organization."""
     try:
-        package = await generate_zk_audit_package(tenant_id)
+        package = await generate_zk_audit_package(
+            principal.organization_id
+        )
         return package
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Audit package generation failed: {str(e)}")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="audit_package_generation_failed",
+        )
 
 from federation import verify_peer_node
 from pydantic import BaseModel
@@ -133,21 +143,43 @@ async def send_sovereign_alert(alert: SovereignAlert):
 from assistant import ExecutiveQuery, process_executive_query
 
 @app.post("/v1/assistant/query")
-async def executive_assistant_query(q: ExecutiveQuery):
-    """Natural language sovereign intelligence assistant for executives."""
+async def executive_assistant_query(
+    q: ExecutiveQuery,
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.ASSISTANT_USE)
+    ),
+):
+    """Natural-language intelligence scoped to the authenticated organization."""
     try:
-        result = await process_executive_query(q.tenant_id, q.query_text)
+        result = await process_executive_query(
+            principal.organization_id,
+            q.query_text,
+        )
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Executive query processing failed: {str(e)}")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="executive_query_processing_failed",
+        )
 
 from liquidity import LiquidityOverviewRequest, calculate_sovereign_liquidity
 
 @app.post("/v1/liquidity/overview")
-async def sovereign_liquidity_overview(req: LiquidityOverviewRequest):
-    """Multi-currency dynamic liquidity and FX exposure overview."""
+async def sovereign_liquidity_overview(
+    req: LiquidityOverviewRequest,
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.PORTFOLIO_READ)
+    ),
+):
+    """Liquidity overview scoped to the authenticated organization."""
     try:
-        result = await calculate_sovereign_liquidity(req.tenant_id, req.base_currency)
+        result = await calculate_sovereign_liquidity(
+            principal.organization_id,
+            req.base_currency,
+        )
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Liquidity calculation failed: {str(e)}")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="liquidity_calculation_failed",
+        )

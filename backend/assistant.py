@@ -1,11 +1,12 @@
 import aiosqlite
 import hashlib
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from database import DB_PATH
 
 class ExecutiveQuery(BaseModel):
-    tenant_id: str
+    model_config = ConfigDict(extra="forbid")
+
     query_text: str
 
 async def process_executive_query(tenant_id: str, query_text: str) -> dict:

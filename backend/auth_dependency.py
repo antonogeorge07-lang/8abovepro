@@ -54,3 +54,21 @@ async def current_principal(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid_session",
         )
+
+
+def permission_required(permission):
+    from auth_context import require_permission
+
+    async def dependency(
+        principal: PrincipalContext = Depends(current_principal),
+    ) -> PrincipalContext:
+        try:
+            require_permission(principal, permission)
+            return principal
+        except OrganizationAccessDenied as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(exc),
+            )
+
+    return dependency
