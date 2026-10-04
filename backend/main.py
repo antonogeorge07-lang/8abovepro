@@ -6,6 +6,9 @@ from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from database import SovereignDBPool
+from auth_context import PrincipalContext
+from auth_dependency import current_principal
+from fastapi import Depends
 from ingestion import process_csv_feed
 from legislation_engine import JurisdictionMonitor
 
@@ -37,6 +40,24 @@ class TenantProfileCheck(BaseModel):
     tenant_id: str
     jurisdiction: str = Field(..., description="e.g. CH_SWITZERLAND, UAE_DIFC, IN_SEBI")
     held_asset_classes: List[str]
+
+
+
+@app.get("/v1/me")
+async def get_current_identity(
+    principal: PrincipalContext = Depends(current_principal),
+):
+    return {
+        "user_id": principal.user_id,
+        "email": principal.email,
+        "organization": {
+            "id": principal.organization_id,
+            "name": principal.organization_name,
+        },
+        "membership_id": principal.membership_id,
+        "role": principal.role.value,
+    }
+
 
 @app.get("/v1/health")
 async def health_check():
