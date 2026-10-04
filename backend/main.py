@@ -97,3 +97,14 @@ async def verify_peer(req: PeerSyncRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Federation verification failed: {str(e)}")
+
+from dispatcher import SovereignAlert, dispatch_sovereign_alert
+
+@app.post("/v1/dispatch/alert")
+async def send_sovereign_alert(alert: SovereignAlert):
+    """Dispatches real-time autonomous security and legislative alerts to private channels."""
+    try:
+        result = await dispatch_sovereign_alert(alert)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Alert dispatch failed: {str(e)}")
