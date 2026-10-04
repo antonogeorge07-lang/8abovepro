@@ -108,3 +108,14 @@ async def send_sovereign_alert(alert: SovereignAlert):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Alert dispatch failed: {str(e)}")
+
+from assistant import ExecutiveQuery, process_executive_query
+
+@app.post("/v1/assistant/query")
+async def executive_assistant_query(q: ExecutiveQuery):
+    """Natural language sovereign intelligence assistant for executives."""
+    try:
+        result = await process_executive_query(q.tenant_id, q.query_text)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Executive query processing failed: {str(e)}")
