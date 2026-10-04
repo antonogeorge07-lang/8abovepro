@@ -1,7 +1,7 @@
 import aiosqlite
 import os
 
-DB_PATH = "sovereign_ledger.db"
+DB_PATH = os.getenv("SOVEREIGN_DB_PATH", "sovereign_ledger.db")
 
 class SovereignDBPool:
     @staticmethod
