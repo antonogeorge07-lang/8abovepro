@@ -119,3 +119,14 @@ async def executive_assistant_query(q: ExecutiveQuery):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Executive query processing failed: {str(e)}")
+
+from liquidity import LiquidityOverviewRequest, calculate_sovereign_liquidity
+
+@app.post("/v1/liquidity/overview")
+async def sovereign_liquidity_overview(req: LiquidityOverviewRequest):
+    """Multi-currency dynamic liquidity and FX exposure overview."""
+    try:
+        result = await calculate_sovereign_liquidity(req.tenant_id, req.base_currency)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Liquidity calculation failed: {str(e)}")
