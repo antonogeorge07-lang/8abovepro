@@ -1,0 +1,120 @@
+name: 8above CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend validation
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Compile backend
+        run: |
+          python -m compileall -q .
+
+      - name: Run backend tests
+        run: |
+          pytest -q
+
+  frontend:
+    name: Frontend validation
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+  repository-security:
+    name: Repository security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository for prohibited secrets
+        run: |
+          python3 scripts/ci/check_no_secrets.py
+
+  container:
+    name: Backend container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: |
+          docker build \
+            --tag 8above/backend:${GITHUB_SHA} \
+            ./backend
+
+      - name: Validate compose configuration
+        run: |
+          docker compose config --quiet
+
+  ci-complete:
+    name: CI complete
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+      - repository-security
+      - container
+
+    steps:
+      - name: Confirm release eligibility
+        run: echo "8above CI gates passed"

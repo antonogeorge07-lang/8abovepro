@@ -1,0 +1,115 @@
+name: Build Client Deployment Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: Client deployment profile
+        required: true
+        type: string
+
+      release:
+        description: Release tag, for example v0.1.0
+        required: true
+        type: string
+
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  package-client:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate release identifier
+        shell: bash
+        run: |
+          RELEASE="${{ inputs.release }}"
+
+          if [[ ! "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
+            echo "Invalid release identifier: $RELEASE"
+            echo "Expected immutable semantic release tag such as v0.1.0"
+            exit 1
+          fi
+
+      - name: Checkout requested release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release }}
+
+      - name: Verify immutable release tag
+        shell: bash
+        run: |
+          RELEASE="${{ inputs.release }}"
+
+          git show-ref --verify --quiet "refs/tags/${RELEASE}" || {
+            echo "Release tag does not exist: ${RELEASE}"
+            exit 1
+          }
+
+          EXPECTED="$(git rev-list -n 1 "${RELEASE}")"
+          ACTUAL="$(git rev-parse HEAD)"
+
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "Release checkout does not match immutable tag"
+            exit 1
+          fi
+
+      - name: Validate client profile
+        shell: bash
+        run: |
+          CLIENT="${{ inputs.client }}"
+          PROFILE="deploy/clients/${CLIENT}/client.env.example"
+
+          if [[ ! "$CLIENT" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            echo "Invalid client identifier"
+            exit 1
+          fi
+
+          if [ ! -f "$PROFILE" ]; then
+            echo "Unknown client profile: $CLIENT"
+            exit 1
+          fi
+
+          echo "Validated client profile: $CLIENT"
+
+      - name: Build client manifest
+        shell: bash
+        run: |
+          CLIENT="${{ inputs.client }}"
+          ENVIRONMENT="${{ inputs.environment }}"
+
+          mkdir -p out
+
+          cp \
+            "deploy/clients/${CLIENT}/client.env.example" \
+            out/client-profile.env
+
+          cat > out/deployment-manifest.txt <<MANIFEST
+8above_release=${{ inputs.release }}
+commit=${GITHUB_SHA}
+client=${CLIENT}
+environment=${ENVIRONMENT}
+generated_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+MANIFEST
+
+          sha256sum \
+            out/client-profile.env \
+            out/deployment-manifest.txt \
+            > out/SHA256SUMS
+
+      - name: Upload client deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: >-
+            8above-${{ inputs.client }}-${{ inputs.environment }}-${{ inputs.release }}
+          path: out/
+          if-no-files-found: error
