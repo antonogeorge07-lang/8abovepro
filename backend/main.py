@@ -70,3 +70,30 @@ async def ingest_statement(
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingestion pipeline error: {str(e)}")
+
+from audit_exporter import generate_zk_audit_package
+
+@app.get("/v1/audit/export/{tenant_id}")
+async def export_audit_package(tenant_id: str):
+    """Generates a cryptographically sealed Zero-Knowledge audit package for external auditors."""
+    try:
+        package = await generate_zk_audit_package(tenant_id)
+        return package
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audit package generation failed: {str(e)}")
+
+from federation import verify_peer_node
+from pydantic import BaseModel
+
+class PeerSyncRequest(BaseModel):
+    peer_tenant_id: str
+    peer_integrity_root: str
+
+@app.post("/v1/federation/verify-peer")
+async def verify_peer(req: PeerSyncRequest):
+    """Handshake endpoint for cross-border sovereign node synchronization."""
+    try:
+        result = await verify_peer_node(req.peer_tenant_id, req.peer_integrity_root)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Federation verification failed: {str(e)}")
