@@ -1,6 +1,6 @@
-fastapi
-uvicorn
-pydantic
-asyncpg
-aiosqlite
-email-validator
+fastapi==0.142.2
+uvicorn==0.54.0
+pydantic==2.13.5
+asyncpg==0.31.0
+aiosqlite==0.22.1
+email-validator==2.3.0

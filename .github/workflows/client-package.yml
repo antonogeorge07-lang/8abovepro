@@ -4,17 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       client:
-        description: Client deployment profile
+        description: "Client deployment profile"
         required: true
         type: string
-
       release:
-        description: Release tag, for example v0.1.0
+        description: "Immutable release tag, for example v0.1.0"
         required: true
         type: string
-
       environment:
-        description: Target environment
+        description: "Target environment"
         required: true
         type: choice
         options:
@@ -26,34 +24,52 @@ permissions:
 
 jobs:
   package-client:
+    name: Client deployment package
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate release identifier
+      - name: Validate inputs
         shell: bash
+        env:
+          CLIENT: ${{ inputs.client }}
+          RELEASE: ${{ inputs.release }}
         run: |
-          RELEASE="${{ inputs.release }}"
+          case "$CLIENT" in
+            ''|*[!a-z0-9-]*)
+              echo "Invalid client identifier: $CLIENT"
+              exit 1
+              ;;
+          esac
 
-          if [[ ! "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
-            echo "Invalid release identifier: $RELEASE"
-            echo "Expected immutable semantic release tag such as v0.1.0"
-            exit 1
-          fi
+          case "$RELEASE" in
+            v[0-9]*.[0-9]*.[0-9]*)
+              ;;
+            *)
+              echo "Invalid release identifier: $RELEASE"
+              echo "Expected an immutable version tag such as v0.1.0"
+              exit 1
+              ;;
+          esac
 
       - name: Checkout requested release
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Verify immutable release tag
         shell: bash
+        env:
+          RELEASE: ${{ inputs.release }}
         run: |
-          RELEASE="${{ inputs.release }}"
-
-          git show-ref --verify --quiet "refs/tags/${RELEASE}" || {
-            echo "Release tag does not exist: ${RELEASE}"
-            exit 1
-          }
+          git show-ref \
+            --verify \
+            --quiet \
+            "refs/tags/${RELEASE}" || {
+              echo "Release tag does not exist: ${RELEASE}"
+              exit 1
+            }
 
           EXPECTED="$(git rev-list -n 1 "${RELEASE}")"
           ACTUAL="$(git rev-parse HEAD)"
@@ -65,14 +81,10 @@ jobs:
 
       - name: Validate client profile
         shell: bash
+        env:
+          CLIENT: ${{ inputs.client }}
         run: |
-          CLIENT="${{ inputs.client }}"
           PROFILE="deploy/clients/${CLIENT}/client.env.example"
-
-          if [[ ! "$CLIENT" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-            echo "Invalid client identifier"
-            exit 1
-          fi
 
           if [ ! -f "$PROFILE" ]; then
             echo "Unknown client profile: $CLIENT"
@@ -83,23 +95,24 @@ jobs:
 
       - name: Build client manifest
         shell: bash
+        env:
+          CLIENT: ${{ inputs.client }}
+          RELEASE: ${{ inputs.release }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          CLIENT="${{ inputs.client }}"
-          ENVIRONMENT="${{ inputs.environment }}"
-
           mkdir -p out
 
           cp \
             "deploy/clients/${CLIENT}/client.env.example" \
             out/client-profile.env
 
-          cat > out/deployment-manifest.txt <<MANIFEST
-8above_release=${{ inputs.release }}
-commit=${GITHUB_SHA}
-client=${CLIENT}
-environment=${ENVIRONMENT}
-generated_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-MANIFEST
+          {
+            echo "8above_release=${RELEASE}"
+            echo "commit=${GITHUB_SHA}"
+            echo "client=${CLIENT}"
+            echo "environment=${TARGET_ENVIRONMENT}"
+            echo "generated_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          } > out/deployment-manifest.txt
 
           sha256sum \
             out/client-profile.env \
@@ -109,7 +122,6 @@ MANIFEST
       - name: Upload client deployment package
         uses: actions/upload-artifact@v4
         with:
-          name: >-
-            8above-${{ inputs.client }}-${{ inputs.environment }}-${{ inputs.release }}
+          name: 8above-${{ inputs.client }}-${{ inputs.environment }}-${{ inputs.release }}
           path: out/
           if-no-files-found: error
