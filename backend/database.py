@@ -1,6 +1,8 @@
 import aiosqlite
 import os
 
+from iam_schema import initialize_iam_schema
+
 DB_PATH = os.getenv("SOVEREIGN_DB_PATH", "sovereign_ledger.db")
 
 class SovereignDBPool:
@@ -27,6 +29,9 @@ class SovereignDBPool:
                     logged_at TEXT NOT NULL
                 )
             """)
+
+            await initialize_iam_schema(db)
+
             await db.commit()
 
     @staticmethod
