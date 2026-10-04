@@ -1,3 +1,4 @@
+from account_api import router as account_router
 import hashlib
 import json
 from datetime import datetime
@@ -28,6 +29,8 @@ app.add_middleware(
 )
 
 legislative_monitor = JurisdictionMonitor()
+
+app.include_router(account_router)
 
 @app.on_event("startup")
 async def startup_event():

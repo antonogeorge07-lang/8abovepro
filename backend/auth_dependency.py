@@ -11,6 +11,10 @@ from auth_context import (
     resolve_principal_context,
 )
 from database import DB_PATH
+from identity_context import (
+    AuthenticatedIdentity,
+    resolve_authenticated_identity,
+)
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -72,3 +76,27 @@ def permission_required(permission):
             )
 
     return dependency
+
+
+
+async def current_identity(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> AuthenticatedIdentity:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="authentication_required",
+        )
+
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            return await resolve_authenticated_identity(
+                db,
+                bearer_token=credentials.credentials,
+            )
+
+    except AuthenticationError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid_session",
+        )

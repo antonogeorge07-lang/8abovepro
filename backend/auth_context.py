@@ -1,11 +1,14 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 import aiosqlite
 
 from authorization import Permission, authorize
 from identity import MembershipStatus, Role
-from security import hash_session_token
+from identity_context import (
+    AuthenticatedIdentity,
+    AuthenticationError,
+    resolve_authenticated_identity,
+)
 
 
 @dataclass(frozen=True)
@@ -18,10 +21,6 @@ class PrincipalContext:
     role: Role
 
 
-class AuthenticationError(Exception):
-    pass
-
-
 class OrganizationSelectionRequired(AuthenticationError):
     pass
 
@@ -30,59 +29,18 @@ class OrganizationAccessDenied(AuthenticationError):
     pass
 
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
 async def resolve_principal_context(
     db: aiosqlite.Connection,
     *,
     bearer_token: str,
     requested_organization_id: str | None = None,
 ) -> PrincipalContext:
-    if not bearer_token:
-        raise AuthenticationError("missing_session")
+    identity: AuthenticatedIdentity = await resolve_authenticated_identity(
+        db,
+        bearer_token=bearer_token,
+    )
 
-    token_hash = hash_session_token(bearer_token)
-
-    async with db.execute(
-        """
-        SELECT
-            s.user_id,
-            s.status AS session_status,
-            s.expires_at,
-            u.email,
-            u.status AS user_status
-        FROM sessions s
-        JOIN users u ON u.id = s.user_id
-        WHERE s.token_hash = ?
-        LIMIT 1
-        """,
-        (token_hash,),
-    ) as cursor:
-        session_row = await cursor.fetchone()
-
-    if session_row is None:
-        raise AuthenticationError("invalid_session")
-
-    (
-        user_id,
-        session_status,
-        expires_at,
-        email,
-        user_status,
-    ) = session_row
-
-    if session_status != "active":
-        raise AuthenticationError("inactive_session")
-
-    if user_status != "active":
-        raise AuthenticationError("inactive_user")
-
-    if expires_at <= utc_now_iso():
-        raise AuthenticationError("expired_session")
-
-    params: list[str] = [user_id]
+    params: list[str] = [identity.user_id]
 
     sql = """
         SELECT
@@ -109,13 +67,19 @@ async def resolve_principal_context(
         memberships = await cursor.fetchall()
 
     if requested_organization_id is not None and not memberships:
-        raise OrganizationAccessDenied("organization_access_denied")
+        raise OrganizationAccessDenied(
+            "organization_access_denied"
+        )
 
     if not memberships:
-        raise AuthenticationError("no_active_membership")
+        raise AuthenticationError(
+            "no_active_membership"
+        )
 
     if requested_organization_id is None and len(memberships) > 1:
-        raise OrganizationSelectionRequired("organization_selection_required")
+        raise OrganizationSelectionRequired(
+            "organization_selection_required"
+        )
 
     (
         membership_id,
@@ -127,8 +91,8 @@ async def resolve_principal_context(
     ) = memberships[0]
 
     return PrincipalContext(
-        user_id=user_id,
-        email=email,
+        user_id=identity.user_id,
+        email=identity.email,
         organization_id=organization_id,
         organization_name=organization_name,
         membership_id=membership_id,
@@ -154,4 +118,6 @@ def require_permission(
     )
 
     if not decision.allowed:
-        raise OrganizationAccessDenied(decision.reason)
+        raise OrganizationAccessDenied(
+            decision.reason
+        )

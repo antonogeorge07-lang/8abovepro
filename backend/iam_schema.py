@@ -109,6 +109,26 @@ async def initialize_iam_schema(db: aiosqlite.Connection) -> None:
                 ON DELETE SET NULL
         );
 
+        CREATE TABLE IF NOT EXISTS onboarding_states (
+            organization_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL
+                CHECK(status IN ('in_progress', 'completed')),
+            current_step TEXT NOT NULL,
+            completed_steps_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+
+            FOREIGN KEY(organization_id)
+                REFERENCES organizations(id)
+                ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_invitations_org
+            ON invitations(organization_id);
+
+        CREATE INDEX IF NOT EXISTS idx_invitations_email
+            ON invitations(email);
+
         CREATE INDEX IF NOT EXISTS idx_memberships_user
             ON memberships(user_id);
 
