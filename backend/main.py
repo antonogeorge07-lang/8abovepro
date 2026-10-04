@@ -1,11 +1,16 @@
+from account_api import router as account_router
 import hashlib
 import json
 from datetime import datetime
 from typing import List
 from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from database import SovereignDBPool
+from auth_context import PrincipalContext
+from authorization import Permission
+from auth_dependency import current_principal, permission_required
+from fastapi import Depends
 from ingestion import process_csv_feed
 from legislation_engine import JurisdictionMonitor
 
@@ -25,6 +30,8 @@ app.add_middleware(
 
 legislative_monitor = JurisdictionMonitor()
 
+app.include_router(account_router)
+
 @app.on_event("startup")
 async def startup_event():
     await SovereignDBPool.initialize()
@@ -34,53 +41,109 @@ async def shutdown_event():
     await SovereignDBPool.close()
 
 class TenantProfileCheck(BaseModel):
-    tenant_id: str
-    jurisdiction: str = Field(..., description="e.g. CH_SWITZERLAND, UAE_DIFC, IN_SEBI")
+    model_config = ConfigDict(extra="forbid")
+
+    jurisdiction: str = Field(
+        ...,
+        description="e.g. CH_SWITZERLAND, UAE_DIFC, IN_SEBI",
+    )
     held_asset_classes: List[str]
+
+
+
+@app.get("/v1/me")
+async def get_current_identity(
+    principal: PrincipalContext = Depends(current_principal),
+):
+    return {
+        "user_id": principal.user_id,
+        "email": principal.email,
+        "organization": {
+            "id": principal.organization_id,
+            "name": principal.organization_name,
+        },
+        "membership_id": principal.membership_id,
+        "role": principal.role.value,
+    }
+
 
 @app.get("/v1/health")
 async def health_check():
     return {"status": "ONLINE", "mode": "SOVEREIGN_AIR_GAPPED", "timestamp": datetime.utcnow().isoformat() + "Z"}
 
 @app.post("/v1/governance/impact-radar")
-async def check_legislative_impact(profile: TenantProfileCheck):
-    """Dynamically scans pipeline and enacted laws, returning Good/Moderate/Bad/Worse impact flags."""
+async def check_legislative_impact(
+    profile: TenantProfileCheck,
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.PORTFOLIO_READ)
+    ),
+):
+    """Evaluates legislative exposure for the authenticated organization."""
     try:
-        exposures = legislative_monitor.evaluate_tenant_exposure(profile.jurisdiction, profile.held_asset_classes)
+        exposures = legislative_monitor.evaluate_tenant_exposure(
+            profile.jurisdiction,
+            profile.held_asset_classes,
+        )
+
         return {
-            "tenant_id": profile.tenant_id,
+            "tenant_id": principal.organization_id,
             "monitored_jurisdiction": profile.jurisdiction,
             "total_alerts": len(exposures),
             "impact_assessment_matrix": exposures,
-            "audit_timestamp": datetime.utcnow().isoformat() + "Z"
+            "audit_timestamp": datetime.utcnow().isoformat() + "Z",
         }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Impact radar failure: {str(e)}")
+
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="impact_radar_failure",
+        )
 
 @app.post("/v1/ingest/statement")
 async def ingest_statement(
-    tenant_id: str = Form(...),
     custodian: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.LEDGER_INGEST)
+    ),
 ):
-    """Ingests multi-custodian CSV statements with SHA-256 cryptographic non-repudiation."""
+    """Ingests statements into the authenticated organization's ledger."""
     try:
         file_bytes = await file.read()
-        result = await process_csv_feed(tenant_id, custodian, file_bytes)
+
+        result = await process_csv_feed(
+            principal.organization_id,
+            custodian,
+            file_bytes,
+        )
+
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ingestion pipeline error: {str(e)}")
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="ingestion_pipeline_error",
+        )
 
 from audit_exporter import generate_zk_audit_package
 
-@app.get("/v1/audit/export/{tenant_id}")
-async def export_audit_package(tenant_id: str):
-    """Generates a cryptographically sealed Zero-Knowledge audit package for external auditors."""
+@app.get("/v1/audit/export")
+async def export_audit_package(
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.AUDIT_EXPORT)
+    ),
+):
+    """Generates an audit package scoped to the authenticated organization."""
     try:
-        package = await generate_zk_audit_package(tenant_id)
+        package = await generate_zk_audit_package(
+            principal.organization_id
+        )
         return package
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Audit package generation failed: {str(e)}")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="audit_package_generation_failed",
+        )
 
 from federation import verify_peer_node
 from pydantic import BaseModel
@@ -112,21 +175,43 @@ async def send_sovereign_alert(alert: SovereignAlert):
 from assistant import ExecutiveQuery, process_executive_query
 
 @app.post("/v1/assistant/query")
-async def executive_assistant_query(q: ExecutiveQuery):
-    """Natural language sovereign intelligence assistant for executives."""
+async def executive_assistant_query(
+    q: ExecutiveQuery,
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.ASSISTANT_USE)
+    ),
+):
+    """Natural-language intelligence scoped to the authenticated organization."""
     try:
-        result = await process_executive_query(q.tenant_id, q.query_text)
+        result = await process_executive_query(
+            principal.organization_id,
+            q.query_text,
+        )
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Executive query processing failed: {str(e)}")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="executive_query_processing_failed",
+        )
 
 from liquidity import LiquidityOverviewRequest, calculate_sovereign_liquidity
 
 @app.post("/v1/liquidity/overview")
-async def sovereign_liquidity_overview(req: LiquidityOverviewRequest):
-    """Multi-currency dynamic liquidity and FX exposure overview."""
+async def sovereign_liquidity_overview(
+    req: LiquidityOverviewRequest,
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.PORTFOLIO_READ)
+    ),
+):
+    """Liquidity overview scoped to the authenticated organization."""
     try:
-        result = await calculate_sovereign_liquidity(req.tenant_id, req.base_currency)
+        result = await calculate_sovereign_liquidity(
+            principal.organization_id,
+            req.base_currency,
+        )
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Liquidity calculation failed: {str(e)}")
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="liquidity_calculation_failed",
+        )

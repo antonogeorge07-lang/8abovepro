@@ -2,3 +2,5 @@ fastapi
 uvicorn
 pydantic
 asyncpg
+aiosqlite
+email-validator

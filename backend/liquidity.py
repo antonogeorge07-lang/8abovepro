@@ -1,8 +1,9 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class LiquidityOverviewRequest(BaseModel):
-    tenant_id: str
+    model_config = ConfigDict(extra="forbid")
+
     base_currency: str = "USD"
 
 async def calculate_sovereign_liquidity(tenant_id: str, base_currency: str) -> dict:

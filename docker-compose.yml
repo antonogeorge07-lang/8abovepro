@@ -10,7 +10,7 @@ services:
       - sovereign_data:/app/data
     environment:
       - NODE_MODE=SOVEREIGN_AIR_GAPPED
-      - DATABASE_URL=sqlite+aiosqlite:///data/sovereign_ledger.db
+      - SOVEREIGN_DB_PATH=/app/data/sovereign_ledger.db
 
 volumes:
   sovereign_data:
