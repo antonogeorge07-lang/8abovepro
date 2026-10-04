@@ -113,3 +113,102 @@ def test_liquidity_uses_authenticated_organization():
 
     assert response.status_code == 200
     assert response.json()["tenant_id"] == "org_authorized"
+
+
+def test_ingestion_requires_ledger_ingest_permission():
+    app.dependency_overrides[current_principal] = viewer_principal
+
+    response = client.post(
+        "/v1/ingest/statement",
+        data={
+            "custodian": "Test Custodian",
+        },
+        files={
+            "file": (
+                "statement.csv",
+                b"timestamp,asset,value\n2026-10-04T00:00:00Z,CASH,100\n",
+                "text/csv",
+            ),
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_ingestion_uses_authenticated_organization(monkeypatch):
+    app.dependency_overrides[current_principal] = owner_principal
+
+    captured = {}
+
+    async def fake_process_csv_feed(
+        tenant_id,
+        custodian,
+        file_bytes,
+    ):
+        captured["tenant_id"] = tenant_id
+        captured["custodian"] = custodian
+
+        return {
+            "tenant_id": tenant_id,
+            "custodian": custodian,
+            "total_rows_processed": 1,
+            "ledger_signatures": [],
+            "status": "SECURE_INGESTION_COMPLETE",
+        }
+
+    import main
+
+    monkeypatch.setattr(
+        main,
+        "process_csv_feed",
+        fake_process_csv_feed,
+    )
+
+    response = client.post(
+        "/v1/ingest/statement",
+        data={
+            "tenant_id": "org_attacker",
+            "custodian": "Test Custodian",
+        },
+        files={
+            "file": (
+                "statement.csv",
+                b"timestamp,asset,value\n2026-10-04T00:00:00Z,CASH,100\n",
+                "text/csv",
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tenant_id"] == "org_authorized"
+    assert captured["tenant_id"] == "org_authorized"
+
+
+def test_governance_rejects_client_supplied_tenant_id():
+    app.dependency_overrides[current_principal] = owner_principal
+
+    response = client.post(
+        "/v1/governance/impact-radar",
+        json={
+            "tenant_id": "org_attacker",
+            "jurisdiction": "UAE_DIFC",
+            "held_asset_classes": ["ALL"],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_governance_uses_authenticated_organization():
+    app.dependency_overrides[current_principal] = owner_principal
+
+    response = client.post(
+        "/v1/governance/impact-radar",
+        json={
+            "jurisdiction": "UAE_DIFC",
+            "held_asset_classes": ["ALL"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tenant_id"] == "org_authorized"

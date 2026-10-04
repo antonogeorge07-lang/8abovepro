@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List
 from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from database import SovereignDBPool
 from auth_context import PrincipalContext
 from authorization import Permission
@@ -38,8 +38,12 @@ async def shutdown_event():
     await SovereignDBPool.close()
 
 class TenantProfileCheck(BaseModel):
-    tenant_id: str
-    jurisdiction: str = Field(..., description="e.g. CH_SWITZERLAND, UAE_DIFC, IN_SEBI")
+    model_config = ConfigDict(extra="forbid")
+
+    jurisdiction: str = Field(
+        ...,
+        description="e.g. CH_SWITZERLAND, UAE_DIFC, IN_SEBI",
+    )
     held_asset_classes: List[str]
 
 
@@ -65,33 +69,58 @@ async def health_check():
     return {"status": "ONLINE", "mode": "SOVEREIGN_AIR_GAPPED", "timestamp": datetime.utcnow().isoformat() + "Z"}
 
 @app.post("/v1/governance/impact-radar")
-async def check_legislative_impact(profile: TenantProfileCheck):
-    """Dynamically scans pipeline and enacted laws, returning Good/Moderate/Bad/Worse impact flags."""
+async def check_legislative_impact(
+    profile: TenantProfileCheck,
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.PORTFOLIO_READ)
+    ),
+):
+    """Evaluates legislative exposure for the authenticated organization."""
     try:
-        exposures = legislative_monitor.evaluate_tenant_exposure(profile.jurisdiction, profile.held_asset_classes)
+        exposures = legislative_monitor.evaluate_tenant_exposure(
+            profile.jurisdiction,
+            profile.held_asset_classes,
+        )
+
         return {
-            "tenant_id": profile.tenant_id,
+            "tenant_id": principal.organization_id,
             "monitored_jurisdiction": profile.jurisdiction,
             "total_alerts": len(exposures),
             "impact_assessment_matrix": exposures,
-            "audit_timestamp": datetime.utcnow().isoformat() + "Z"
+            "audit_timestamp": datetime.utcnow().isoformat() + "Z",
         }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Impact radar failure: {str(e)}")
+
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="impact_radar_failure",
+        )
 
 @app.post("/v1/ingest/statement")
 async def ingest_statement(
-    tenant_id: str = Form(...),
     custodian: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    principal: PrincipalContext = Depends(
+        permission_required(Permission.LEDGER_INGEST)
+    ),
 ):
-    """Ingests multi-custodian CSV statements with SHA-256 cryptographic non-repudiation."""
+    """Ingests statements into the authenticated organization's ledger."""
     try:
         file_bytes = await file.read()
-        result = await process_csv_feed(tenant_id, custodian, file_bytes)
+
+        result = await process_csv_feed(
+            principal.organization_id,
+            custodian,
+            file_bytes,
+        )
+
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ingestion pipeline error: {str(e)}")
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="ingestion_pipeline_error",
+        )
 
 from audit_exporter import generate_zk_audit_package
 
